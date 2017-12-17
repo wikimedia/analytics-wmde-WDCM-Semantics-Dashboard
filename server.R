@@ -4,7 +4,7 @@
 ### ---------------------------------------------------------------------------
 
 ### --- Setup
-rm(list = ls())
+
 ### --------------------------------
 ### --- general
 library(shiny)
@@ -92,7 +92,7 @@ colnames(wdcm2_projects_2dmaps) <- c('D1', 'D2', 'Project', 'Project Type', 'Cat
 dbDisconnect(con)
 
 ### --- Fetch local files
-setwd('/home/goransm/WMDE/WDCM/WDCM_SemanticsDashboard/data/')
+setwd('/srv/shiny-server/WDCM_SemanticsDashboard/data/')
 
 ### --- fetch projecttopic tables
 lF <- list.files()
@@ -133,6 +133,14 @@ names(visNetworkEdges) <- sapply(lF, function(x) {
            fixed = T)[[1]][4]
 })
 
+### --- Fetch update info
+setwd('/srv/shiny-server/WDCM_SemanticsDashboard/update/')
+update <- read.csv('toLabsReport.csv', 
+                   header = T,
+                   check.names = F,
+                   stringsAsFactors = F,
+                   row.names = 1)
+
 ### - Determine Constants
 # - determine Projects
 projects <- wdcmProject$Project
@@ -159,6 +167,16 @@ names(unzip_projectTypes) <- search_projectTypes
 
 ### --- shinyServer
 shinyServer(function(input, output, session) {
+  
+  ### --- output: updateInfo
+  output$updateInfo <- renderText({
+    date <- update$timeStamp[dim(update)[1]]
+    date <- strsplit(as.character(date), split = " ", fixed = T)[[1]][1]
+    date <- strsplit(date, split = "-", fixed = T)
+    date[[1]][2] <- month.name[as.numeric(date[[1]][2])]
+    date <- paste(unlist(date), collapse = " ")
+    return(paste("<p align=right>Last update: <i>", date, "</i></p>", sep = ""))
+  })
   
   ### ------------------------------------------
   ### --- TAB: tabPanel Semantic Models
@@ -215,7 +233,7 @@ shinyServer(function(input, output, session) {
       sC <- gsub(" ", "", input$selectCategory, fixed = T)
       sTable <- itemTopicTables[which(grepl(sC, itemTopicTables, fixed = T))]
       cTopic <- tolower(gsub(" ", "", input$selectCategoryTopic))
-      if (!length(cTopic) == 0) {
+      if (!(length(cTopic) == 0)) {
         ### -- Connect
         con <- dbConnect(MySQL(),
                          host = "tools.labsdb",
@@ -274,8 +292,8 @@ shinyServer(function(input, output, session) {
     
     if (!is.null(itemTopic())) {
       # - normalization: Luce's choice axiom
-      itemNames <- itemTopic()$eu_label
-      root <- select(itemTopic(), starts_with('topic'))
+      itemNames <- itemTopic()$eu_entity_id
+      root <- dplyr::select(itemTopic(), starts_with('topic'))
       root <- as.matrix(parDist(as.matrix(root), method = "euclidean"))
       rownames(root) <- itemNames
       colnames(root) <- itemNames
@@ -299,6 +317,9 @@ shinyServer(function(input, output, session) {
         nodes$id[which(nodes$label %in% x)]
       })
       conceptsStruct$arrows <- rep("to", length(conceptsStruct$to))
+      nodes$label <- sapply(nodes$label, function(x) {
+        itemTopic()$eu_label[itemTopic()$eu_entity_id == x]
+      })
       visNetwork(nodes = nodes,
                  edges = conceptsStruct,
                  width = "100%",
@@ -376,7 +397,7 @@ shinyServer(function(input, output, session) {
     if (!is.null(input$selectProject)) {
       wUnzip <- which(names(unzip_projectTypes) %in% input$selectProject)
       if (length(wUnzip > 0)) {
-        selectedProjects <- unname(do.call(c, unzip_projectTypes[wUnzip]))
+        selectedProjects <- unname(do.call('c', unzip_projectTypes[wUnzip]))
       }
       wSel <- which(projects %in% input$selectProject)
       if (length(wSel > 0)) {
@@ -407,7 +428,6 @@ shinyServer(function(input, output, session) {
                    starts_with('topic'))
           catName <- gsub("([[:lower:]])([[:upper:]])", "\\1 \\2", names(projectTopic)[cCategory])
           # - FIX THIS:
-          catName <- gsub("Workof Art", "Work of Art", catName, fixed = T) 
           cProj$Category <- catName
           cProj <- cProj %>% 
             select(Topic, Probability, Category) %>% 
@@ -423,7 +443,10 @@ shinyServer(function(input, output, session) {
       projList <- as.data.frame(rbindlist(projList[wEl]))
       # - factor projList$Topic:
       projList$Topic <- str_to_title(gsub("([[:alpha:]]+)", "\\1 ", projList$Topic))
-      projList$Topic <- factor(projList$Topic, levels = unique(projList$Topic))
+      topicLevels <- unique(projList$Topic)
+      topicLevelsOrd <- as.numeric(str_extract(topicLevels, "[[:digit:]]+"))
+      topicLevels <- topicLevels[order(topicLevelsOrd)]
+      projList$Topic <- factor(projList$Topic, levels = topicLevels)
       # - visualize w. ggplot2
       ggplot(projList,
              aes(x = Topic, 
