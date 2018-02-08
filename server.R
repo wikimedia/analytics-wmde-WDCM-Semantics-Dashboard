@@ -20,7 +20,7 @@ library(reshape2)
 library(parallelDist)
 ### --- visualization
 library(RColorBrewer)
-library(visNetwork)
+library(twork)
 library(networkD3)
 library(ggplot2)
 library(ggrepel)
@@ -107,27 +107,27 @@ names(projectTopic) <- sapply(lF, function(x) {
            fixed = T)[[1]][3]
 })
 
-### --- fetch wdcm2_visNetworkNodes_project tables
+### --- fetch wdcm2_tworkNodes_project tables
 lF <- list.files()
-lF <- lF[grepl("wdcm2_visNetworkNodes_project", lF, fixed = T)]
-visNetworkNodes <- vector(mode = "list", length = length(lF))
+lF <- lF[grepl("wdcm2_tworkNodes_project", lF, fixed = T)]
+tworkNodes <- vector(mode = "list", length = length(lF))
 for (i in 1:length(lF)) {
-  visNetworkNodes[[i]] <- fread(lF[i])
+  tworkNodes[[i]] <- fread(lF[i])
 }
-names(visNetworkNodes) <- sapply(lF, function(x) {
+names(tworkNodes) <- sapply(lF, function(x) {
   strsplit(strsplit(x, split = ".", fixed = T)[[1]][1],
            split = "_",
            fixed = T)[[1]][4]
 })
 
-### --- fetch wdcm2_visNetworkEdges_project tables
+### --- fetch wdcm2_tworkEdges_project tables
 lF <- list.files()
-lF <- lF[grepl("wdcm2_visNetworkEdges_project", lF, fixed = T)]
-visNetworkEdges <- vector(mode = "list", length = length(lF))
+lF <- lF[grepl("wdcm2_tworkEdges_project", lF, fixed = T)]
+tworkEdges <- vector(mode = "list", length = length(lF))
 for (i in 1:length(lF)) {
-  visNetworkEdges[[i]] <- fread(lF[i])
+  tworkEdges[[i]] <- fread(lF[i])
 }
-names(visNetworkEdges) <- sapply(lF, function(x) {
+names(tworkEdges) <- sapply(lF, function(x) {
   strsplit(strsplit(x, split = ".", fixed = T)[[1]][1],
            split = "_",
            fixed = T)[[1]][4]
