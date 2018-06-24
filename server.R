@@ -20,7 +20,6 @@ library(reshape2)
 library(parallelDist)
 ### --- visualization
 library(RColorBrewer)
-library(twork)
 library(networkD3)
 library(ggplot2)
 library(ggrepel)
@@ -30,12 +29,16 @@ library(scales)
 ### --------------------------------
 
 ### --- Credentials
+# - credentials on tools.labsdb
+setwd('/home/goransm/WMDE/WDCM/WDCM_RScripts')
+cred <- readLines('/home/goransm/mySQL_Credentials/replica.my.cnf')
+mySQLCreds <- data.frame(user = gsub("^[[:alnum:]]+\\s=\\s", "", cred[2]),
+                         password = gsub("^[[:alnum:]]+\\s=\\s", "", cred[3]),
+                         stringsAsFactors = F)
+rm(cred)
+
 # setwd('/home/goransm/WMDE/WDCM/WDCM_RScripts/WDCM_Dashboard/aux')
 setwd('/srv/shiny-server/aux')
-
-mySQLCreds <- fread("mySQLCreds.csv", 
-                    header = T,
-                    drop = 1)
 
 ### -- Connect
 con <- dbConnect(MySQL(), 
@@ -107,27 +110,27 @@ names(projectTopic) <- sapply(lF, function(x) {
            fixed = T)[[1]][3]
 })
 
-### --- fetch wdcm2_tworkNodes_project tables
+### --- fetch wdcm2_networkNodes_project tables
 lF <- list.files()
-lF <- lF[grepl("wdcm2_tworkNodes_project", lF, fixed = T)]
-tworkNodes <- vector(mode = "list", length = length(lF))
+lF <- lF[grepl("wdcm2_visNetworkNodes_project", lF, fixed = T)]
+networkNodes <- vector(mode = "list", length = length(lF))
 for (i in 1:length(lF)) {
-  tworkNodes[[i]] <- fread(lF[i])
+  networkNodes[[i]] <- fread(lF[i])
 }
-names(tworkNodes) <- sapply(lF, function(x) {
+names(networkNodes) <- sapply(lF, function(x) {
   strsplit(strsplit(x, split = ".", fixed = T)[[1]][1],
            split = "_",
            fixed = T)[[1]][4]
 })
 
-### --- fetch wdcm2_tworkEdges_project tables
+### --- fetch wdcm2_networkEdges_project tables
 lF <- list.files()
-lF <- lF[grepl("wdcm2_tworkEdges_project", lF, fixed = T)]
-tworkEdges <- vector(mode = "list", length = length(lF))
+lF <- lF[grepl("wdcm2_visNetworkEdges_project", lF, fixed = T)]
+networkEdges <- vector(mode = "list", length = length(lF))
 for (i in 1:length(lF)) {
-  tworkEdges[[i]] <- fread(lF[i])
+  networkEdges[[i]] <- fread(lF[i])
 }
-names(tworkEdges) <- sapply(lF, function(x) {
+names(networkEdges) <- sapply(lF, function(x) {
   strsplit(strsplit(x, split = ".", fixed = T)[[1]][1],
            split = "_",
            fixed = T)[[1]][4]
