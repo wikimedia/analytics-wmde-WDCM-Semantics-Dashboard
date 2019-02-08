@@ -16,34 +16,38 @@ library(stringr)
 library(tidyr)
 library(dplyr)
 library(reshape2)
+library(XML)
 ### --- compute
 library(parallelDist)
 ### --- visualization
+library(visNetwork)
 library(RColorBrewer)
 library(networkD3)
 library(ggplot2)
 library(ggrepel)
 library(scales)
+library(rbokeh)
 
 ### --- Server (Session) Scope
 ### --------------------------------
 
+### --- Config File
+params <- xmlParse('wdcmConfig_wdcmSemanticsDashboard.xml')
+params <- xmlToList(params)
+
 ### --- Credentials
 # - credentials on tools.labsdb
-setwd('/home/goransm/WMDE/WDCM/WDCM_RScripts')
-cred <- readLines('/home/goransm/mySQL_Credentials/replica.my.cnf')
+cred <- readLines(params$mySQL_Credentials_Path)
 mySQLCreds <- data.frame(user = gsub("^[[:alnum:]]+\\s=\\s", "", cred[2]),
                          password = gsub("^[[:alnum:]]+\\s=\\s", "", cred[3]),
                          stringsAsFactors = F)
 rm(cred)
 
-# setwd('/home/goransm/WMDE/WDCM/WDCM_RScripts/WDCM_Dashboard/aux')
-setwd('/srv/shiny-server/aux')
 
 ### -- Connect
 con <- dbConnect(MySQL(), 
                  host = "tools.labsdb", 
-                 defult.file = "/home/goransm/mySQL_Credentials/replica.my.cnf",
+                 default.file = "/home/goransm/mySQL_Credentials/replica.my.cnf",
                  dbname = "u16664__wdcm_p",
                  user = mySQLCreds$user,
                  password = mySQLCreds$password)
@@ -95,7 +99,7 @@ colnames(wdcm2_projects_2dmaps) <- c('D1', 'D2', 'Project', 'Project Type', 'Cat
 dbDisconnect(con)
 
 ### --- Fetch local files
-setwd('/srv/shiny-server/WDCM_SemanticsDashboard/data/')
+setwd(params$localFilesPath)
 
 ### --- fetch projecttopic tables
 lF <- list.files()
@@ -137,8 +141,7 @@ names(networkEdges) <- sapply(lF, function(x) {
 })
 
 ### --- Fetch update info
-setwd('/srv/shiny-server/WDCM_SemanticsDashboard/update/')
-update <- read.csv('toLabsReport.csv', 
+update <- read.csv(params$update_File_Path, 
                    header = T,
                    check.names = F,
                    stringsAsFactors = F,
@@ -171,19 +174,23 @@ names(unzip_projectTypes) <- search_projectTypes
 ### --- shinyServer
 shinyServer(function(input, output, session) {
   
-  ### --- output: updateInfo
-  output$updateInfo <- renderText({
-    date <- update$timeStamp[dim(update)[1]]
-    date <- strsplit(as.character(date), split = " ", fixed = T)[[1]][1]
-    date <- strsplit(date, split = "-", fixed = T)
-    date[[1]][2] <- month.name[as.numeric(date[[1]][2])]
-    date <- paste(unlist(date), collapse = " ")
-    return(paste("<p align=right>Last update: <i>", date, "</i></p>", sep = ""))
+  ### --- output: updateString
+  output$updateString <- renderText({
+    date <- update[max(which(grepl("Orchestra END", update$Step))), ]$Time
+    date <- paste0(date, " UTC")
+    return(paste('<p style="font-size:80%;"align="right"><b>Last update: </b><i>', date, '</i></p>', sep = ""))
   })
   
   ### ------------------------------------------
   ### --- TAB: tabPanel Semantic Models
   ### ------------------------------------------
+  
+  ### --- output: updateString
+  output$updateString <- renderText({
+    date <- update[max(which(grepl("Orchestra END", update$Step))), ]$Time
+    date <- paste0(date, " UTC")
+    return(paste('<p style="font-size:80%;"align="right"><b>Last update: </b><i>', date, '</i></p>', sep = ""))
+  })
   
   ### --- SELECT: update select 'selectCategory'
   updateSelectizeInput(session,
@@ -200,7 +207,7 @@ shinyServer(function(input, output, session) {
     ### -- Connect
     con <- dbConnect(MySQL(), 
                      host = "tools.labsdb", 
-                     defult.file = "/home/goransm/mySQL_Credentials/replica.my.cnf",
+                     default.file = "/home/goransm/mySQL_Credentials/replica.my.cnf",
                      dbname = "u16664__wdcm_p",
                      user = mySQLCreds$user,
                      password = mySQLCreds$password)
@@ -240,7 +247,7 @@ shinyServer(function(input, output, session) {
         ### -- Connect
         con <- dbConnect(MySQL(),
                          host = "tools.labsdb",
-                         defult.file = "/home/goransm/mySQL_Credentials/replica.my.cnf",
+                         default.file = "/home/goransm/mySQL_Credentials/replica.my.cnf",
                          dbname = "u16664__wdcm_p",
                          user = mySQLCreds$user,
                          password = mySQLCreds$password)
@@ -456,8 +463,10 @@ shinyServer(function(input, output, session) {
                  y = Proportion, 
                  label = paste(Proportion, "%", sep = ""))
              ) +
-        geom_bar(stat = "identity", width = .1, color = "#4c8cff", fill = "#4c8cff", group = 1) +
-        geom_label(size = 4) +
+        geom_line(group = 1, size = .25, color = "#4c8cff") +
+        geom_point(size = 1.5, color ="#4c8cff", fill = "#4c8cff") + 
+        geom_point(size = 1, color = "white") + 
+        geom_text_repel(size = 4) +
         facet_wrap(~ Category, ncol = 3, scales = "free_y") +
         xlab('Topic') + ylab('Topic Engagement (%)') +
         scale_y_continuous(labels = comma) + 
